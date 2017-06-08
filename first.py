@@ -8,10 +8,22 @@ def versionToDim(version):
 def versionToBytePos(version):
     assert version == 1
     dim = versionToDim(version)
-    return [('up', (slice(dim-6,dim-2), slice(dim-2,dim))),
-            ('up', (slice(dim-10,dim-6), slice(dim-2,dim))),
-            ('left', (slice(dim-12,dim-10), slice(dim-4,dim))),
-            ]
+    # The following dict contains the orientations and positions
+    # of the data fields in the QR code for version 1
+    fields = [('up', (slice(dim-6, dim-2), slice(dim-2, dim))),
+              ('up', (slice(dim-10, dim-6), slice(dim-2, dim))),
+              ('left', (slice(dim-12, dim-10), slice(dim-4, dim))),
+              ('down', (slice(dim-10, dim-6), slice(dim-4, dim-2))),
+              ('down', (slice(dim-6, dim-2), slice(dim-4, dim-2))),
+              ('right', (slice(dim-2, dim), slice(dim-6, dim-2))),
+              ('up', (slice(dim-6, dim-2), slice(dim-6, dim-4))),
+              ('up', (slice(dim-10, dim-6), slice(dim-6, dim-4))),
+              ('left', (slice(dim-12, dim-10), slice(dim-8, dim-4))),
+              ('down', (slice(dim-10, dim-6), slice(dim-8, dim-6))),
+              ('down', (slice(dim-6, dim-2), slice(dim-8, dim-6))),
+              ('right', (slice(dim-2, dim), slice(dim-10, dim-6))),
+              ]
+    return fields
 
 def emptyCode(version):
     dim = versionToDim(version)
@@ -45,28 +57,33 @@ def fixedPattern(version):
     pattern[8:dim-8:2,6] = True
     return pattern
 
-def encode_byte(int, direction):
+class Byte:
+    def __init__(self, val):
+        self.__val = val
+
+    def __getitem__(self, num):
+        return (self.__val>>num)&0x1
+
+def encode_byte(byte, direction):
     if direction == 'up':
-        ret = np.zeros((4,2))
-        ret[3,1] = (int>>0)&0x1
-        ret[3,0] = (int>>1)&0x1
-        ret[2,1] = (int>>2)&0x1
-        ret[2,0] = (int>>3)&0x1
-        ret[1,1] = (int>>4)&0x1
-        ret[1,0] = (int>>5)&0x1
-        ret[0,1] = (int>>6)&0x1
-        ret[0,0] = (int>>7)&0x1
+        ret = [[byte[7], byte[6]],
+               [byte[5], byte[4]],
+               [byte[3], byte[2]],
+               [byte[1], byte[0]]]
         return ret
     elif direction == 'left':
-        ret = np.zeros((2,4))
-        ret[1,3] = (int>>0)&0x1
-        ret[1,2] = (int>>1)&0x1
-        ret[0,3] = (int>>2)&0x1
-        ret[0,2] = (int>>3)&0x1
-        ret[0,1] = (int>>4)&0x1
-        ret[0,0] = (int>>5)&0x1
-        ret[1,1] = (int>>6)&0x1
-        ret[1,0] = (int>>7)&0x1
+        ret = [[byte[5], byte[4], byte[3], byte[2]],
+               [byte[7], byte[6], byte[1], byte[0]]]
+        return ret
+    elif direction == 'down':
+        ret = [[byte[1], byte[0]],
+               [byte[3], byte[2]],
+               [byte[5], byte[4]],
+               [byte[7], byte[6]]]
+        return ret
+    elif direction == 'right':
+        ret = [[byte[7], byte[6], byte[1], byte[0]],
+               [byte[5], byte[4], byte[3], byte[2]]]
         return ret
 
 
@@ -77,10 +94,10 @@ def raw_data(version, string):
     # encoding (alphanumeric)
     data[dim-1,dim-2] = True
     print len(string)
-    data[pos[0][1]] = encode_byte(len(string), direction=pos[0][0])
+    data[pos[0][1]] = encode_byte(Byte(len(string)), direction=pos[0][0])
     
     for num, char in enumerate(string):
-        data[pos[num+1][1]] = encode_byte(ord(char),
+        data[pos[num+1][1]] = encode_byte(Byte(ord(char)),
                                           direction=pos[num+1][0])
 
     return data
@@ -96,10 +113,12 @@ def generateCode(string, version):
     merged = np.logical_or(merged, data)
     return merged
 
-if __name__ == '__main__':
-    string = "He"
+def main():
+    string = "Hello world"
     version = 1
     code = generateCode(string, version)
 
     plt.imshow(code, interpolation="none", cmap="Greys")
     plt.show()
+
+main()
